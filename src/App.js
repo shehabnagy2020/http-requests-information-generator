@@ -1,23 +1,177 @@
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
 
 function App() {
+  const [requests, setRequests] = useState([]);
+
+  const addRequest = (newRequest) => {
+    setRequests([...requests, newRequest]);
+  };
+
+  const downloadMarkdown = () => {
+    const markdown = convertToMarkdown(requests);
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'requests.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const convertToMarkdown = (requests) => {
+    return requests.map((req, index) => `
+## Request ${index + 1}
+
+**URL:** ${req.url}
+
+**Method:** ${req.method}
+
+**Payload:**
+\`\`\`json
+${req.payload}
+\`\`\`
+
+**Response:**
+\`\`\`json
+${req.response}
+\`\`\`
+    `).join('\n');
+  };
+
+  const exportToJson = () => {
+    const json = JSON.stringify(requests, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'requests.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const importFromJson = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const importedRequests = JSON.parse(e.target.result);
+        setRequests(importedRequests);
+      };
+      reader.readAsText(file);
+    }
+  };
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <h1>HTTP Requests Tracker</h1>
+      <RequestForm addRequest={addRequest} />
+      <RequestList requests={requests} />
+      <div className="button-container">
+        <button onClick={downloadMarkdown}>Download Markdown</button>
+        <button onClick={exportToJson}>Export to JSON</button>
+        <input
+          type="file"
+          accept="application/json"
+          onChange={importFromJson}
+          style={{ display: 'none' }}
+          id="jsonInput"
+        />
+        <label htmlFor="jsonInput" className="file-upload-label">
+          Import from JSON
+        </label>
+      </div>
+    </div>
+  );
+}
+
+function RequestForm({ addRequest }) {
+  const [url, setUrl] = useState('');
+  const [method, setMethod] = useState('GET');
+  const [payload, setPayload] = useState('');
+  const [response, setResponse] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const newRequest = { url, method, payload, response };
+    addRequest(newRequest);
+    setUrl('');
+    setMethod('GET');
+    setPayload('');
+    setResponse('');
+  };
+
+  const handleUrlChange = (e) => {
+    const inputUrl = e.target.value;
+    // Convert regular URL to regex pattern
+    const regexUrl = inputUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                            .replace(/\d+/g, '\\d+')
+                            .replace(/\//g, '\\/')
+                            .replace(/\./g, '\\.');
+    setUrl(regexUrl);
+  };
+
+  return (
+    <div className="request-form">
+      <h2>Add New Request</h2>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="url">URL:</label>
+          <input type="text" id="url" value={url} onChange={handleUrlChange} required />
+        </div>
+        <div className="form-group">
+          <label htmlFor="method">Method:</label>
+          <select id="method" value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option value="GET">GET</option>
+            <option value="POST">POST</option>
+            <option value="PUT">PUT</option>
+            <option value="DELETE">DELETE</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="payload">Payload:</label>
+          <textarea id="payload" rows="4" value={payload} onChange={(e) => setPayload(e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="response">Response:</label>
+          <textarea id="response" rows="4" value={response} onChange={(e) => setResponse(e.target.value)} />
+        </div>
+        <div className="button-container">
+          <button type="submit">Add Request</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function RequestList({ requests }) {
+  const [openIndex, setOpenIndex] = useState(-1);
+
+  const toggleDetails = (index) => {
+    setOpenIndex(index === openIndex ? -1 : index);
+  };
+
+  return (
+    <div>
+      <h2>Request List</h2>
+      <ul className="request-list">
+        {requests.map((request, index) => (
+          <li key={index} className="request-item">
+            <div className="request-header" onClick={() => toggleDetails(index)}>
+              {openIndex === index ? '▼' : '►'} {request.url}
+            </div>
+            {openIndex === index && (
+              <div className="request-details">
+                <strong>Method:</strong> {request.method}<br />
+                <strong>Payload:</strong> {request.payload}<br />
+                <strong>Response:</strong> {request.response}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
