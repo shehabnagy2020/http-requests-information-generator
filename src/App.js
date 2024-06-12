@@ -3,16 +3,29 @@ import './App.css';
 
 function App() {
   const [requests, setRequests] = useState([]);
+  const [editIndex, setEditIndex] = useState(null);
 
   const addRequest = (newRequest) => {
-    setRequests([...requests, newRequest]);
+    if (editIndex !== null) {
+      const updatedRequests = requests.map((request, index) =>
+        index === editIndex ? newRequest : request
+      );
+      setRequests(updatedRequests);
+      setEditIndex(null);
+    } else {
+      setRequests([...requests, newRequest]);
+    }
+  };
+
+  const editRequest = (index) => {
+    setEditIndex(index);
   };
 
   const downloadMarkdown = () => {
     const markdown = convertToMarkdown(requests);
     const blob = new Blob([markdown], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = new document.createElement('a');
     a.href = url;
     a.download = 'requests.md';
     document.body.appendChild(a);
@@ -21,7 +34,8 @@ function App() {
   };
 
   const convertToMarkdown = (requests) => {
-    return requests.map((req, index) => `
+    return requests
+      .map((req, index) => `
 ## Request ${index + 1}
 
 **URL:** ${req.url}
@@ -37,7 +51,8 @@ ${req.payload}
 \`\`\`json
 ${req.response}
 \`\`\`
-    `).join('\n');
+      `)
+      .join('\n');
   };
 
   const exportToJson = () => {
@@ -67,8 +82,8 @@ ${req.response}
   return (
     <div className="App">
       <h1>HTTP Requests Tracker</h1>
-      <RequestForm addRequest={addRequest} />
-      <RequestList requests={requests} />
+      <RequestForm addRequest={addRequest} editIndex={editIndex} requests={requests} />
+      <RequestList requests={requests} editRequest={editRequest} />
       <div className="button-container">
         <button onClick={downloadMarkdown}>Download Markdown</button>
         <button onClick={exportToJson}>Export to JSON</button>
@@ -87,7 +102,7 @@ ${req.response}
   );
 }
 
-function RequestForm({ addRequest }) {
+function RequestForm({ addRequest, editIndex, requests }) {
   const [url, setUrl] = useState('');
   const [method, setMethod] = useState('GET');
   const [payload, setPayload] = useState('');
@@ -105,17 +120,27 @@ function RequestForm({ addRequest }) {
 
   const handleUrlChange = (e) => {
     const inputUrl = e.target.value;
-    // Convert regular URL to regex pattern
-    const regexUrl = inputUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-                            .replace(/\d+/g, '\\d+')
-                            .replace(/\//g, '\\/')
-                            .replace(/\./g, '\\.');
+    const regexUrl = inputUrl
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      .replace(/\d+/g, '\\d+')
+      .replace(/\//g, '\\/')
+      .replace(/\./g, '\\.');
     setUrl(regexUrl);
   };
 
+  React.useEffect(() => {
+    if (editIndex !== null) {
+      const request = requests[editIndex];
+      setUrl(request.url);
+      setMethod(request.method);
+      setPayload(request.payload);
+      setResponse(request.response);
+    }
+  }, [editIndex, requests]);
+
   return (
     <div className="request-form">
-      <h2>Add New Request</h2>
+      <h2>{editIndex !== null ? 'Edit Request' : 'Add New Request'}</h2>
       <form onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="url">URL:</label>
@@ -139,14 +164,14 @@ function RequestForm({ addRequest }) {
           <textarea id="response" rows="4" value={response} onChange={(e) => setResponse(e.target.value)} />
         </div>
         <div className="button-container">
-          <button type="submit">Add Request</button>
+          <button type="submit">{editIndex !== null ? 'Update Request' : 'Add Request'}</button>
         </div>
       </form>
     </div>
   );
 }
 
-function RequestList({ requests }) {
+function RequestList({ requests, editRequest }) {
   const [openIndex, setOpenIndex] = useState(-1);
 
   const toggleDetails = (index) => {
@@ -161,11 +186,16 @@ function RequestList({ requests }) {
           <li key={index} className="request-item">
             <div className="request-header" onClick={() => toggleDetails(index)}>
               {openIndex === index ? '▼' : '►'} {request.url}
+              <button className="edit-button" onClick={() => editRequest(index)}>
+                Edit
+              </button>
             </div>
             {openIndex === index && (
               <div className="request-details">
-                <strong>Method:</strong> {request.method}<br />
-                <strong>Payload:</strong> {request.payload}<br />
+                <strong>Method:</strong> {request.method}
+                <br />
+                <strong>Payload:</strong> {request.payload}
+                <br />
                 <strong>Response:</strong> {request.response}
               </div>
             )}
